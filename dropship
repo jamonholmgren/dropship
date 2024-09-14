@@ -1,0 +1,153 @@
+#!/bin/bash
+
+# Dropship CLI
+
+main() {
+	VERSION="0.1.0"
+
+	# Colors
+
+	BLUE='\033[1;34m'
+	YELLOW='\033[1;33m'
+	RED='\033[1;31m'
+	DKGRAY='\033[0;30m'
+	CYAN='\033[1;36m'
+	GREEN='\033[1;32m'
+	END='\033[0m' # End Color
+
+	function replace_in_file {
+		local filename=$1
+		local variable_name=$2
+		local replace_with=$3
+		local os_type
+		os_type=$(uname -s)
+
+		if [[ $os_type == "Darwin" ]]; then
+			sed -i '' "s/\$${variable_name}/${replace_with}/g" "$filename"
+		elif [[ $os_type == "Linux" ]]; then
+			sed -i "s/\$${variable_name}/${replace_with}/g" "$filename"
+		fi
+	}
+
+	# Print header
+
+	p ""
+	p "${BLUE}Dropship -- Ship your app to a DigitalOcean Droplet${END}"
+	p ""
+
+	# Print version and exit
+
+	if [[ $1 == "-v" || $1 == "--version" ]]; then
+		p "${VERSION}"
+		return 0
+	fi
+
+	# Setup command
+
+	if [[ $1 == "setup" ]]; then
+		ask DOMAIN "${YELLOW}What domain will this be hosted on?${END} ${DKGRAY}(e.g. jamon.dev)${END}" validate_domain
+		ask DEPLOY_REMOTE "${YELLOW}What should we name the git remote?${END} ${DKGRAY}(e.g. droplet)${END}" validate_remote
+		p ""
+		p "${GREEN}Deployment setup complete!${END}"
+		p ""
+		p "${YELLOW}Next steps:${END}"
+		p ""
+		p "  git push ${DEPLOY_REMOTE}"
+		p ""
+		p "${YELLOW}Support Dropship development:${END}"
+		p ""
+		p "  ${CYAN}Star the repo: ${DKGRAY}https://github.com/jamonholmgren/dropship${END}"
+		p "  ${CYAN}Tell me what you're making with it: ${DKGRAY}https://x.com/jamonholmgren${END}"
+		p ""
+
+		return 0
+	fi
+
+	# If we don't recognize $1, say that
+	if [[ -n $1 && $1 != "-h" && $1 != "--help" ]]; then
+		p "${RED}Unrecognized command: $1${END}"
+		p "Run 'dropship --help' for usage information."
+		p ""
+		return 1
+	fi
+
+	# Otherwise, print help
+
+	p "${YELLOW}Installation:${END}"
+	p ""
+	p "${CYAN}alias dropship='source <(curl -sSL https://raw.githubusercontent.com/jamonholmgren/dropship/main/dropship)'${END}"
+	p ""
+	p "${CYAN}Usage:${END} dropship [command|option]"
+	p ""
+	p "${CYAN}Commands:${END}"
+	p "  setup           Set up deployment to a DigitalOcean Droplet"
+	p ""
+	p "${CYAN}Options:${END}"
+	p "  -h, --help      Show help"
+	p "  -v, --version   Show version number"
+	p ""
+	p "${CYAN}Examples:${END}"
+	p "  dropship --help"
+	p "  dropship -v"
+	p "  dropship setup"
+	p ""
+	p "If you need more help, please visit:"
+	p "  ${DKGRAY}https://github.com/jamonholmgren/dropship${END}"
+	p ""
+	return 0
+}
+
+function ask() {
+	local domain_var="$1"
+	local prompt_message="$2"
+	local validation_func="$3"
+	local error_message="${RED}Invalid input.${END}"
+
+	while true; do
+		if [[ -z "${!domain_var}" ]]; then
+			p "$prompt_message"
+			read -r "${domain_var?}"
+		fi
+
+		if [[ -n "${!domain_var}" ]]; then
+			if [[ -n "$validation_func" ]]; then
+				if $validation_func "${!domain_var}"; then
+					break
+				else
+					p "$error_message"
+					unset "${domain_var}"
+				fi
+			else
+				break
+			fi
+		else
+			p "${RED}Cannot be empty.${END}"
+		fi
+	done
+}
+
+function p() {
+	echo -e "$1"
+}
+
+function validate_domain() {
+	local domain="$1"
+	if [[ $domain =~ ^[a-zA-Z0-9\.\-]+$ ]]; then
+		return 0
+	else
+		p "${RED}Domain name can only contain numbers, letters, dashes, and periods.${END}"
+		return 1
+	fi
+}
+
+function validate_remote() {
+	local remote="$1"
+	if [[ $remote =~ ^[a-zA-Z0-9_\-]+$ ]]; then
+		return 0
+	else
+		p "${RED}Remote name can only contain letters, numbers, underscores, and hyphens.${END}"
+		return 1
+	fi
+}
+
+main "$@"
