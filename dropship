@@ -7,12 +7,17 @@ main() {
 
 	# Colors
 
-	BLUE='\033[1;34m'
-	YELLOW='\033[1;33m'
-	RED='\033[1;31m'
+	BLUE_BOLD='\033[1;34m'
+	BLUE='\033[0;34m'
+	YELLOW_BOLD='\033[1;33m'
+	YELLOW='\033[0;33m'
+	RED_BOLD='\033[1;31m'
+	RED='\033[0;31m'
 	DKGRAY='\033[0;30m'
-	CYAN='\033[1;36m'
-	GREEN='\033[1;32m'
+	CYAN_BOLD='\033[1;36m'
+	CYAN='\033[0;36m'
+	GREEN_BOLD='\033[1;32m'
+	GREEN='\033[0;32m'
 	END='\033[0m' # End Color
 
 	# Check prerequisites
@@ -21,7 +26,7 @@ main() {
 
 	# Header
 	p ""
-	p "${BLUE}Dropship -- Ship your app to a DigitalOcean Droplet${END}"
+	p "${BLUE_BOLD}Dropship -- Ship your app to a DigitalOcean Droplet${END}"
 	p ""
 
 	# Version
@@ -34,13 +39,14 @@ main() {
 	# Setup command
 	if [[ $1 == "setup" ]]; then
 		# Prerequisite: `doctl`
-		p "${BLUE}Dropship uses DigitalOcean's ${YELLOW}doctl${BLUE} CLI tool to set up Droplets.${END}"
+		p "Dropship uses DigitalOcean's ${YELLOW_BOLD}doctl${END} CLI tool to set up Droplets."
 		p ""
 
 		if $DOCTL_INSTALLED; then
 			p "${GREEN}✅ doctl is installed!${END}"
 		else
 			if ! install_doctl; then
+				p ""
 				return 1
 			fi
 		fi
@@ -198,9 +204,13 @@ function check_brew() {
 function install_doctl() {
 	if $BREW_INSTALLED; then
 		if ask_yn "${YELLOW}Would you like to install doctl via Homebrew? (Y/n)${END}"; then
-			p "${CYAN}Installing doctl...${END}"
-			brew install doctl
-			p "${GREEN}doctl installed successfully!${END}"
+			if [[ "${DEBUG}" == "1" ]]; then
+				brew install doctl
+			else
+				# Hide output and show a simple progress indicator
+				(brew install doctl) &>/dev/null &
+				show_progress "Installing doctl" $!
+			fi
 			DOCTL_INSTALLED=true
 		else
 			p "${RED}doctl is required to continue. Please install it manually and run setup again.${END}"
@@ -233,6 +243,20 @@ function ask_yn() {
 			;;
 		esac
 	done
+}
+
+function show_progress() {
+	local message="$1"
+	local pid="$2"
+	local spin='-\|/'
+	local i=0
+	printf "%s " "$message" # Add a space after the message
+	while kill -0 $pid 2>/dev/null; do
+		i=$(((i + 1) % 4))
+		printf "\b${spin:$i:1}"
+		sleep .1
+	done
+	printf "\b...done!\n"
 }
 
 # Kick it off
