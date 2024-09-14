@@ -38,22 +38,23 @@ main() {
 
 	# Setup command
 	if [[ $1 == "setup" ]]; then
-		# Prerequisite: `doctl`
-		p "Dropship uses DigitalOcean's ${YELLOW_BOLD}doctl${END} CLI tool to set up Droplets."
-		p ""
+		# # Prerequisite: `doctl`
+		# p "Dropship uses DigitalOcean's ${YELLOW_BOLD}doctl${END} CLI tool to set up Droplets."
+		# p ""
 
-		if $DOCTL_INSTALLED; then
-			p "${GREEN}✅ doctl is installed!${END}"
-		else
-			if ! install_doctl; then
-				p ""
-				return 1
-			fi
-		fi
+		# if $DOCTL_INSTALLED; then
+		# 	p "${GREEN}✅ doctl is installed!${END}"
+		# else
+		# 	if ! install_doctl; then
+		# 		p ""
+		# 		return 1
+		# 	fi
+		# fi
 
 		# Gather all the info up front
 		ask DOMAIN "${YELLOW}What domain will this be hosted on?${END} ${DKGRAY}(e.g. dropship.jamon.dev)${END}" validate_domain
 		ask DEPLOY_REMOTE "${YELLOW}What should we name the git remote?${END} ${DKGRAY}(e.g. droplet)${END}" validate_remote
+		ask DROPLET_NAME "${YELLOW}What is the Droplet name?${END} ${DKGRAY}(e.g. my-awesome-droplet)" validate_droplet
 
 		p "${YELLOW}Please sign up for DigitalOcean if you have not yet:${END}"
 		p ""
@@ -61,7 +62,31 @@ main() {
 		p ""
 		wait_for_key
 
-		p "Now create a new Droplet."
+		if ask_yn "Do you need me to create a Droplet for you?"; then
+			# Prerequisite: `doctl`
+			p "Dropship uses DigitalOcean's ${YELLOW_BOLD}doctl${END} CLI tool to set up Droplets."
+			p ""
+
+			if $DOCTL_INSTALLED; then
+				p "${GREEN}✅ doctl is installed!${END}"
+			else
+				if ! install_doctl; then
+					p ""
+					return 1
+				fi
+			fi
+
+			p "${YELLOW}Authenticating with DigitalOcean...${END}"
+			doctl auth init
+			p "${GREEN}Authentication successful!${END}"
+
+			create_droplet "$DROPLET_NAME"
+
+			# Add more steps here as needed, such as setting up SSH keys, etc.
+		else
+			p "${YELLOW}Please create a Droplet manually and note its IP address.${END}"
+			ask DROPLET_IP "${YELLOW}What is the Droplet's IP address?${END}" validate_ip
+		fi
 
 		p "" # Manual steps that I still need to script:
 		p "${GREEN}Deployment setup complete!${END}"
@@ -166,6 +191,16 @@ function validate_remote() {
 	fi
 }
 
+function validate_droplet() {
+	local remote="$1"
+	if [[ $remote =~ ^[a-zA-Z0-9_\-]+$ ]]; then
+		return 0
+	else
+		p "${RED}Remote name can only contain letters, numbers, underscores, and hyphens.${END}"
+		return 1
+	fi
+}
+
 function replace_in_file {
 	local filename=$1
 	local variable_name=$2
@@ -203,6 +238,7 @@ function check_brew() {
 
 function install_doctl() {
 	if $BREW_INSTALLED; then
+
 		if ask_yn "${YELLOW}Would you like to install doctl via Homebrew? (Y/n)${END}"; then
 			if [[ "${DEBUG}" == "1" ]]; then
 				brew install doctl
@@ -257,6 +293,46 @@ function show_progress() {
 		sleep .1
 	done
 	printf "\b...done!\n"
+}
+
+function create_droplet() {
+	local droplet_name="$1"
+	local region="nyc1"            # Default region, you can make this configurable
+	local size="s-1vcpu-1gb"       # Default size, you can make this configurable
+	local image="ubuntu-20-04-x64" # Default image, you can make this configurable
+
+	p "${YELLOW}Creating Droplet...${END}"
+	if [[ "${DEBUG}" == "1" ]]; then
+		doctl compute droplet create "$droplet_name" --region "$region" --size "$size" --image "$image"
+	else
+		(doctl compute droplet create "$droplet_name" --region "$region" --size "$size" --image "$image") &>/dev/null &
+		show_progress "Creating Droplet" $!
+	fi
+
+	# Wait for the Droplet to be active
+	p "${YELLOW}Waiting for Droplet to be ready...${END}"
+	while true; do
+		status=$(doctl compute droplet get "$droplet_name" --format Status --no-header)
+		if [[ "$status" == "active" ]]; then
+			break
+		fi
+		sleep 5
+	done
+
+	# Get the Droplet's IP address
+	DROPLET_IP=$(doctl compute droplet get "$droplet_name" --format PublicIPv4 --no-header)
+	p "${GREEN}Droplet created successfully with IP: ${DROPLET_IP}${END}"
+}
+
+# Add this function to validate IP addresses
+function validate_ip() {
+	local ip="$1"
+	if [[ $ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+		return 0
+	else
+		p "${RED}Invalid IP address format. Please use xxx.xxx.xxx.xxx format.${END}"
+		return 1
+	fi
 }
 
 # Kick it off
