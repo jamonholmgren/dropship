@@ -34,6 +34,17 @@ If you encounter any issues while using Dropship, please check the following:
 
 If you still need help, please [open an issue](https://github.com/jamonholmgren/dropship/issues) on GitHub. If I don't reply within a few days, please [let me know on 𝕏](https://x.com/jamonholmgren). I don't mind, promise.
 
+## Support Dropship
+
+- Star this repo
+- Try it out, contribute fixes
+
+## Websites/Web Apps that used Dropship
+
+- [dropship.jamon.dev](https://dropship.jamon.dev) _(coming soon)_ - the home page for this tool
+- **████** - internal Infinite Red video collaboration tool
+- Yours here -- send a PR!
+
 ## Why DigitalOcean Droplets
 
 Hosting your own website on a virtual machine might sound a bit daunting, but it's really not too hard -- especially with Dropship!
