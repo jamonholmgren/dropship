@@ -38,11 +38,13 @@ If you still need help, please [open an issue](https://github.com/jamonholmgren/
 
 - Star this repo
 - Try it out, contribute fixes
+- Use my [DigitalOcean affiliate link](https://m.do.co/c/a78810eb0cff) to get $200 in credit
+- Send me [coffee money]() via a Github one-time sponsorship
 
 ## Websites/Web Apps that used Dropship
 
 - [dropship.jamon.dev](https://dropship.jamon.dev) _(coming soon)_ - the home page for this tool
-- **████** - internal Infinite Red video collaboration tool
+- _**REDACTED**_ - internal Infinite Red video collaboration tool
 - Yours here -- send a PR!
 
 ## Why DigitalOcean Droplets
