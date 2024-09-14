@@ -77,6 +77,13 @@ main() {
 			fi
 
 			p "${YELLOW}Authenticating with DigitalOcean...${END}"
+			p ""
+			p "Note: when you create an API key, enable these scopes:"
+			p "${YELLOW_BOLD}certificate${END} (create, read)"
+			p "${YELLOW_BOLD}domain${END} (create, read, update"
+			p "${YELLOW_BOLD}droplet${END} (create, read, update"
+			p "${YELLOW_BOLD}ssh_key${END} (create, read)"
+			p ""
 			doctl auth init
 			p "${GREEN}Authentication successful!${END}"
 
