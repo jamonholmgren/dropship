@@ -15,6 +15,10 @@ main() {
 	GREEN='\033[1;32m'
 	END='\033[0m' # End Color
 
+	# Check prerequisites
+	check_doctl
+	check_brew
+
 	# Header
 	p ""
 	p "${BLUE}Dropship -- Ship your app to a DigitalOcean Droplet${END}"
@@ -29,9 +33,43 @@ main() {
 
 	# Setup command
 	if [[ $1 == "setup" ]]; then
+		# Prerequisite: `doctl`
+		p "${BLUE}Dropship uses DigitalOcean's ${YELLOW}doctl${BLUE} CLI tool to set up Droplets.${END}"
+		p ""
+
+		if $DOCTL_INSTALLED; then
+			p "${GREEN}✅ doctl is installed!${END}"
+		else
+			if $BREW_INSTALLED; then
+				if ask_yn "${YELLOW}Would you like to install doctl via Homebrew? (Y/n)${END}"; then
+					p "${CYAN}Installing doctl...${END}"
+					brew install doctl
+					p "${GREEN}doctl installed successfully!${END}"
+					DOCTL_INSTALLED=true
+				else
+					p "${RED}doctl is required to continue. Please install it manually and run setup again.${END}"
+					return 1
+				fi
+			else
+				p "${RED}Homebrew is not installed. Please install doctl manually and run setup again.${END}"
+				p "${YELLOW}Visit: ${CYAN}https://docs.digitalocean.com/reference/doctl/how-to/install/${END}"
+				return 1
+			fi
+		fi
+
+		# Gather all the info up front
 		ask DOMAIN "${YELLOW}What domain will this be hosted on?${END} ${DKGRAY}(e.g. dropship.jamon.dev)${END}" validate_domain
 		ask DEPLOY_REMOTE "${YELLOW}What should we name the git remote?${END} ${DKGRAY}(e.g. droplet)${END}" validate_remote
+
+		p "${YELLOW}Please sign up for DigitalOcean if you have not yet:${END}"
 		p ""
+		p "${CYAN}https://m.do.co/c/a78810eb0cff${END} (\$200 credit)"
+		p ""
+		wait_for_key
+
+		p "Now create a new Droplet."
+
+		p "" # Manual steps that I still need to script:
 		p "${GREEN}Deployment setup complete!${END}"
 		p ""
 		p "${YELLOW}Next steps:${END}"
@@ -146,6 +184,48 @@ function replace_in_file {
 	elif [[ $os_type == "Linux" ]]; then
 		sed -i "s/\$${variable_name}/${replace_with}/g" "$filename"
 	fi
+}
+
+function wait_for_key() {
+	p "${YELLOW}Any key to continue...${END}"
+	read -n 1 -s -r
+}
+
+function check_doctl() {
+	if command -v doctl &>/dev/null; then
+		DOCTL_INSTALLED=true
+	else
+		DOCTL_INSTALLED=false
+	fi
+}
+
+function check_brew() {
+	if command -v brew &>/dev/null; then
+		BREW_INSTALLED=true
+	else
+		BREW_INSTALLED=false
+	fi
+}
+
+function ask_yn() {
+	local prompt="$1"
+	local response
+
+	while true; do
+		p "$prompt"
+		read -r response
+		case "$response" in
+		[Yy]* | "")
+			return 0
+			;;
+		[Nn]*)
+			return 1
+			;;
+		*)
+			p "${RED}Please answer yes (y) or no (n).${END}"
+			;;
+		esac
+	done
 }
 
 # Kick it off
