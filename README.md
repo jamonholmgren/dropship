@@ -12,33 +12,11 @@ This will push your latest changes to your "live" server (or whatever you want t
 
 ## Getting Started
 
-The easiest way to use Dropship is directly from your terminal -- no installation or dependencies needed.
-
-_(Note: macOS and Linux only -- contributions welcome for Windows support!)_
+The easiest way to use Dropship is directly from your Mac or Linux terminal -- no installation or dependencies needed. [More info here](#setup-notes)
 
 ```
 alias dropship="source <(curl -sSL https://raw.githubusercontent.com/jamonholmgren/dropship/main/dropship)"
 ```
-
-_Or if you aren't comfortable running it directly from the internet:_
-
-<details>
-<summary><strong>Manual setup</strong></summary>
-Download it:
-
-```
-curl -sSL https://raw.githubusercontent.com/jamonholmgren/dropship/main/dropship > ./dropship
-```
-
-Open the `dropship` file in your editor and review it. If you're comfortable with what it's doing, alias it:
-
-```
-alias dropship="source $PWD/dropship"
-```
-
-</details>
-
-_Note that the `dropship` alias will only be available during this terminal session -- if you want it to stick around longer, just add it to your `.zshrc` or similar._
 
 Then run it from your project root:
 
@@ -59,6 +37,30 @@ Hosting your own website on a virtual machine might sound a bit daunting, but it
 Many other hosts (Vercel, Fly.io, Render) have strict requirements around their free / indie tiers or require setting up Docker if you want to do anything custom. This also includes DigitalOcean's own App Platform. Running it on [DigitalOcean Droplets](https://m.do.co/c/a78810eb0cff) gives you more control.
 
 And if your side project hits the top page of Hacker News, a Droplet is a fixed cost. It might go down temporarily, but you won't ever get a surprise bill for thousands of dollars!
+
+## Setup Notes
+
+Note that the `dropship` alias will only be available during this terminal session -- if you want it to stick around longer, just add it to your `.zshrc` or similar.
+
+**OS Support:** Dropship is built for macOS and Linux only, although it may work on Windows via WSL or Git Bash -- contributions welcome for more robust Windows support!
+
+If you aren't comfortable running Dropship directly from the internet:
+
+<details>
+<summary><strong>Manual setup</strong></summary>
+Download it:
+
+```
+curl -sSL https://raw.githubusercontent.com/jamonholmgren/dropship/main/dropship > ./dropship
+```
+
+Open the `dropship` file in your editor and review it. If you're comfortable with what it's doing, alias it:
+
+```
+alias dropship="source $PWD/dropship"
+```
+
+</details>
 
 ## License
 
