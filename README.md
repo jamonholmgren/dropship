@@ -24,7 +24,7 @@ Then run it from your project root:
 dropship setup
 ```
 
-Dropship will then start and walk you through setting up your project to deploy to a DigitalOcean Droplet.
+Dropship will then start and walk you through setting up your project to deploy to a [DigitalOcean Droplet](https://m.do.co/c/a78810eb0cff).
 
 ## Troubleshooting/Help
 
