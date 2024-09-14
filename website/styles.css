@@ -160,6 +160,18 @@ footer a {
   color: var(--accent-primary);
 }
 
+/* Two-column layout */
+.two-column-layout {
+  display: flex;
+  gap: 30px;
+  margin-bottom: 50px;
+}
+
+.two-column-layout section {
+  flex: 1;
+  margin-bottom: 0;
+}
+
 /* Responsiveness */
 @media (max-width: 768px) {
   header h1 {
@@ -176,5 +188,13 @@ footer a {
 
   .container {
     padding: 10px;
+  }
+
+  .two-column-layout {
+    flex-direction: column;
+  }
+
+  .two-column-layout section {
+    margin-bottom: 30px;
   }
 }
