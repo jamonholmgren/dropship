@@ -40,19 +40,7 @@ main() {
 		if $DOCTL_INSTALLED; then
 			p "${GREEN}✅ doctl is installed!${END}"
 		else
-			if $BREW_INSTALLED; then
-				if ask_yn "${YELLOW}Would you like to install doctl via Homebrew? (Y/n)${END}"; then
-					p "${CYAN}Installing doctl...${END}"
-					brew install doctl
-					p "${GREEN}doctl installed successfully!${END}"
-					DOCTL_INSTALLED=true
-				else
-					p "${RED}doctl is required to continue. Please install it manually and run setup again.${END}"
-					return 1
-				fi
-			else
-				p "${RED}Homebrew is not installed. Please install doctl manually and run setup again.${END}"
-				p "${YELLOW}Visit: ${CYAN}https://docs.digitalocean.com/reference/doctl/how-to/install/${END}"
+			if ! install_doctl; then
 				return 1
 			fi
 		fi
@@ -204,6 +192,25 @@ function check_brew() {
 		BREW_INSTALLED=true
 	else
 		BREW_INSTALLED=false
+	fi
+}
+
+function install_doctl() {
+	if $BREW_INSTALLED; then
+		if ask_yn "${YELLOW}Would you like to install doctl via Homebrew? (Y/n)${END}"; then
+			p "${CYAN}Installing doctl...${END}"
+			brew install doctl
+			p "${GREEN}doctl installed successfully!${END}"
+			DOCTL_INSTALLED=true
+		else
+			p "${RED}doctl is required to continue. Please install it manually and run setup again.${END}"
+			p "${YELLOW}Visit: ${CYAN}https://docs.digitalocean.com/reference/doctl/how-to/install/${END}"
+			return 1
+		fi
+	else
+		p "${RED}Homebrew is not installed. Please install doctl manually and run setup again.${END}"
+		p "${YELLOW}Visit: ${CYAN}https://docs.digitalocean.com/reference/doctl/how-to/install/${END}"
+		return 1
 	fi
 }
 
