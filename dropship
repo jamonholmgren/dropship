@@ -15,27 +15,12 @@ main() {
 	GREEN='\033[1;32m'
 	END='\033[0m' # End Color
 
-	function replace_in_file {
-		local filename=$1
-		local variable_name=$2
-		local replace_with=$3
-		local os_type
-		os_type=$(uname -s)
-
-		if [[ $os_type == "Darwin" ]]; then
-			sed -i '' "s/\$${variable_name}/${replace_with}/g" "$filename"
-		elif [[ $os_type == "Linux" ]]; then
-			sed -i "s/\$${variable_name}/${replace_with}/g" "$filename"
-		fi
-	}
-
-	# Print header
-
+	# Header
 	p ""
 	p "${BLUE}Dropship -- Ship your app to a DigitalOcean Droplet${END}"
 	p ""
 
-	# Print version and exit
+	# Version
 
 	if [[ $1 == "-v" || $1 == "--version" ]]; then
 		p "${VERSION}"
@@ -43,9 +28,8 @@ main() {
 	fi
 
 	# Setup command
-
 	if [[ $1 == "setup" ]]; then
-		ask DOMAIN "${YELLOW}What domain will this be hosted on?${END} ${DKGRAY}(e.g. jamon.dev)${END}" validate_domain
+		ask DOMAIN "${YELLOW}What domain will this be hosted on?${END} ${DKGRAY}(e.g. dropship.jamon.dev)${END}" validate_domain
 		ask DEPLOY_REMOTE "${YELLOW}What should we name the git remote?${END} ${DKGRAY}(e.g. droplet)${END}" validate_remote
 		p ""
 		p "${GREEN}Deployment setup complete!${END}"
@@ -150,4 +134,19 @@ function validate_remote() {
 	fi
 }
 
+function replace_in_file {
+	local filename=$1
+	local variable_name=$2
+	local replace_with=$3
+	local os_type
+	os_type=$(uname -s)
+
+	if [[ $os_type == "Darwin" ]]; then
+		sed -i '' "s/\$${variable_name}/${replace_with}/g" "$filename"
+	elif [[ $os_type == "Linux" ]]; then
+		sed -i "s/\$${variable_name}/${replace_with}/g" "$filename"
+	fi
+}
+
+# Kick it off
 main "$@"
