@@ -1,24 +1,9 @@
 #!/bin/bash
 
-# Dropship CLI
+# Dropship CLI, by Jamon Holmgren
+VERSION="0.1.0"
 
 main() {
-	VERSION="0.1.0"
-
-	# Colors
-
-	BLUE_BOLD='\033[1;34m'
-	BLUE='\033[0;34m'
-	YELLOW_BOLD='\033[1;33m'
-	YELLOW='\033[0;33m'
-	RED_BOLD='\033[1;31m'
-	RED='\033[0;31m'
-	DKGRAY='\033[0;30m'
-	CYAN_BOLD='\033[1;36m'
-	CYAN='\033[0;36m'
-	GREEN_BOLD='\033[1;32m'
-	GREEN='\033[0;32m'
-	END='\033[0m' # End Color
 
 	# Check prerequisites
 	check_doctl
@@ -30,7 +15,6 @@ main() {
 	p ""
 
 	# Version
-
 	if [[ $1 == "-v" || $1 == "--version" ]]; then
 		p "${VERSION}"
 		return 0
@@ -80,20 +64,28 @@ main() {
 			p ""
 			p "Note: when you create an API key, enable these scopes:"
 			p "${YELLOW_BOLD}certificate${END} (create, read)"
-			p "${YELLOW_BOLD}domain${END} (create, read, update"
-			p "${YELLOW_BOLD}droplet${END} (create, read, update"
+			p "${YELLOW_BOLD}domain${END} (create, read, update)"
+			p "${YELLOW_BOLD}droplet${END} (create, read, update)"
 			p "${YELLOW_BOLD}ssh_key${END} (create, read)"
 			p ""
 			doctl auth init
 			p "${GREEN}Authentication successful!${END}"
 
-			create_droplet "$DROPLET_NAME"
+			ok=create_droplet "$DROPLET_NAME"
+
+			if ! ok; then
+				p ""
+				p "${RED}Failed to create Droplet. Please exit and try again or create one manually.${END}"
+				p "${GRAY}View your current droplets here: https://cloud.digitalocean.com/droplets${END}"
+				p ""
+			fi
 
 			# Add more steps here as needed, such as setting up SSH keys, etc.
 		else
 			p "${YELLOW}Please create a Droplet manually and note its IP address.${END}"
-			ask DROPLET_IP "${YELLOW}What is the Droplet's IP address?${END}" validate_ip
 		fi
+
+		ask DROPLET_IP "${YELLOW}What is the Droplet's IP address?${END}" validate_ip
 
 		p "" # Manual steps that I still need to script:
 		p "${GREEN}Deployment setup complete!${END}"
@@ -304,24 +296,43 @@ function show_progress() {
 
 function create_droplet() {
 	local droplet_name="$1"
-	local region="nyc1"            # Default region, you can make this configurable
-	local size="s-1vcpu-1gb"       # Default size, you can make this configurable
-	local image="ubuntu-20-04-x64" # Default image, you can make this configurable
+	local region="nyc1"
+	local size="s-1vcpu-1gb"
+	local image="ubuntu-20-04-x64"
 
 	p "${YELLOW}Creating Droplet...${END}"
+	local output
 	if [[ "${DEBUG}" == "1" ]]; then
-		doctl compute droplet create "$droplet_name" --region "$region" --size "$size" --image "$image"
+		output=$(doctl compute droplet create "$droplet_name" --region "$region" --size "$size" --image "$image" 2>&1)
 	else
-		(doctl compute droplet create "$droplet_name" --region "$region" --size "$size" --image "$image") &>/dev/null &
+		output=$(doctl compute droplet create "$droplet_name" --region "$region" --size "$size" --image "$image" 2>&1)
 		show_progress "Creating Droplet" $!
 	fi
 
+	# Check if the command was successful
+	if [[ $? -ne 0 ]]; then
+		p "${RED}Failed to create Droplet. Error: ${output}${END}"
+		if [[ $output == *"already exists"* ]]; then
+			p "${YELLOW}A Droplet with this name already exists. Please choose a different name.${END}"
+		fi
+		return 1
+	fi
+
+	p "${GRAY}(View Droplet status here: https://cloud.digitalocean.com/droplets)${END}"
+
 	# Wait for the Droplet to be active
 	p "${YELLOW}Waiting for Droplet to be ready...${END}"
+	local max_attempts=60
+	local attempts=0
 	while true; do
 		status=$(doctl compute droplet get "$droplet_name" --format Status --no-header)
 		if [[ "$status" == "active" ]]; then
 			break
+		fi
+		((attempts++))
+		if [[ $attempts -ge $max_attempts ]]; then
+			p "${RED}Timed out waiting for Droplet to become active. Please check your DigitalOcean dashboard.${END}"
+			return 1
 		fi
 		sleep 5
 	done
@@ -329,6 +340,7 @@ function create_droplet() {
 	# Get the Droplet's IP address
 	DROPLET_IP=$(doctl compute droplet get "$droplet_name" --format PublicIPv4 --no-header)
 	p "${GREEN}Droplet created successfully with IP: ${DROPLET_IP}${END}"
+	return 0
 }
 
 # Add this function to validate IP addresses
@@ -341,6 +353,20 @@ function validate_ip() {
 		return 1
 	fi
 }
+
+# Colors
+BLUE_BOLD='\033[1;34m'
+BLUE='\033[0;34m'
+YELLOW_BOLD='\033[1;33m'
+YELLOW='\033[0;33m'
+RED_BOLD='\033[1;31m'
+RED='\033[0;31m'
+DKGRAY='\033[0;30m'
+CYAN_BOLD='\033[1;36m'
+CYAN='\033[0;36m'
+GREEN_BOLD='\033[1;32m'
+GREEN='\033[0;32m'
+END='\033[0m' # End Color
 
 # Kick it off
 main "$@"
