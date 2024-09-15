@@ -38,7 +38,6 @@ main() {
 		# Gather all the info up front
 		ask DOMAIN "${YELLOW}What domain will this be hosted on?${END} ${DKGRAY}(e.g. dropship.jamon.dev)${END}" validate_domain
 		ask DEPLOY_REMOTE "${YELLOW}What should we name the git remote?${END} ${DKGRAY}(e.g. droplet)${END}" validate_remote
-		ask DROPLET_NAME "${YELLOW}What is the Droplet name?${END} ${DKGRAY}(e.g. my-awesome-droplet)" validate_droplet
 
 		p "${YELLOW}Please sign up for DigitalOcean if you have not yet:${END}"
 		p ""
@@ -67,7 +66,6 @@ main() {
 			p "${YELLOW_BOLD}domain${END} (create, read, update)"
 			p "${YELLOW_BOLD}droplet${END} (create, read, update)"
 			p "${YELLOW_BOLD}ssh_key${END} (create, read)"
-			p "${YELLOW_BOLD}sizes${END} (read)"
 			p ""
 
 			if ! doctl auth init; then
@@ -87,19 +85,26 @@ main() {
 
 			p "${GREEN}Authentication successful!${END}"
 
-			if ! create_droplet "$DROPLET_NAME"; then
+			if ! create_droplet ""; then
 				p ""
-				p "${RED}Failed to create Droplet. Please exit and try again or create one manually.${END}"
+				p "${RED}Failed to create or fetch Droplet information. Please exit and try again.${END}"
 				p "${GRAY}View your current droplets here: https://cloud.digitalocean.com/droplets${END}"
 				p ""
+				return 1
 			fi
 
-			# Add more steps here as needed, such as setting up SSH keys, etc.
+			if ! fetch_droplet; then
+				p ""
+				p "${RED}Failed to fetch the ${DROPLET_NAME} droplet.${END}"
+				p "${GRAY}View your current droplets here: https://cloud.digitalocean.com/droplets${END}"
+				p ""
+				return 1
+			fi
+
 		else
 			p "${YELLOW}Please create a Droplet manually and note its IP address.${END}"
+			ask DROPLET_IP "${YELLOW}What is the Droplet's IP address?${END}" validate_ip
 		fi
-
-		ask DROPLET_IP "${YELLOW}What is the Droplet's IP address?${END}" validate_ip
 
 		p "" # Manual steps that I still need to script:
 		p "${GREEN}Deployment setup complete!${END}"
@@ -306,95 +311,70 @@ function show_progress() {
 }
 
 function create_droplet() {
-	local droplet_name="$1"
-	local region="nyc1"
+	local region="sfo3"
 	local image="ubuntu-24-04-x64"
+	local size="s-1vcpu-512mb-10gb"
 
-	local size
-	size=$(select_droplet_size)
+	if ask_yn "${YELLOW}Do you want to create the default smallest droplet (~$4/mo), s-1vcpu-512mb-10gb, in the San Francisco 3 region? (Y/n)${END}"; then
+		ask DROPLET_NAME "${YELLOW}What is the Droplet name?${END} ${DKGRAY}(e.g. my-awesome-droplet)" validate_droplet
 
-	p "${YELLOW}Creating Droplet...${END}"
-	local output
-	if [[ "${DEBUG}" == "1" ]]; then
-		output=$(doctl compute droplet create "$droplet_name" --region "$region" --size "$size" --image "$image" 2>&1)
-	else
-		output=$(doctl compute droplet create "$droplet_name" --region "$region" --size "$size" --image "$image" 2>&1)
-		show_progress "Creating Droplet" $!
-	fi
+		p "${YELLOW}Creating Droplet...${END}"
+		local output
+		output=$(doctl compute droplet create "$DROPLET_NAME" --region "$region" --size "$size" --image "$image" 2>&1)
 
-	# Check if the command was successful
-	if [[ $? -ne 0 ]]; then
-		p "${RED}Failed to create Droplet. Error: ${output}${END}"
-		if [[ $output == *"already exists"* ]]; then
-			p "${YELLOW}A Droplet with this name already exists. Please choose a different name.${END}"
-		fi
-		return 1
-	fi
-
-	p "${GRAY}(View Droplet status here: https://cloud.digitalocean.com/droplets)${END}"
-
-	# Wait for the Droplet to be active
-	p "${YELLOW}Waiting for Droplet to be ready...${END}"
-	local max_attempts=60
-	local attempts=0
-	while true; do
-		status=$(doctl compute droplet get "$droplet_name" --format Status --no-header)
-		if [[ "$status" == "active" ]]; then
-			break
-		fi
-		((attempts++))
-		if [[ $attempts -ge $max_attempts ]]; then
-			p "${RED}Timed out waiting for Droplet to become active. Please check your DigitalOcean dashboard.${END}"
+		# Check if the command was successful
+		if [[ $? -ne 0 ]]; then
+			p "${RED}Failed to create Droplet. Error: ${output}${END}"
 			return 1
 		fi
-		sleep 5
-	done
 
-	# Get the Droplet's IP address
-	DROPLET_IP=$(doctl compute droplet get "$droplet_name" --format PublicIPv4 --no-header)
-	p "${GREEN}Droplet created successfully with IP: ${DROPLET_IP}${END}"
+		p "${GRAY}(View Droplet status here: https://cloud.digitalocean.com/droplets)${END}"
+
+		# Wait for the Droplet to be active
+		p "${YELLOW}Waiting for Droplet to be ready...${END}"
+		local max_attempts=60
+		local attempts=0
+		while true; do
+			status=$(doctl compute droplet get "$DROPLET_NAME" --format Status --no-header)
+			if [[ "$status" == "active" ]]; then
+				break
+			fi
+			((attempts++))
+			if [[ $attempts -ge $max_attempts ]]; then
+				p "${RED}Timed out waiting for Droplet to become active. Please check your DigitalOcean dashboard.${END}"
+				p "${DKGRAY}Link: https://cloud.digitalocean.com/droplets${END}"
+				return 1
+			fi
+			sleep 5
+		done
+
+		# Get the Droplet's IP address
+		DROPLET_IP=$(doctl compute droplet get "$DROPLET_NAME" --format PublicIPv4 --no-header)
+		p "${GREEN}Droplet created successfully with IP: ${DROPLET_IP}${END}"
+	else
+		p "${YELLOW}Please create a droplet instance by going here:${END}"
+		p "${CYAN}https://cloud.digitalocean.com/droplets/new${END}"
+		p ""
+	fi
+
 	return 0
 }
 
-function format_size_list() {
-	doctl compute size list --format Slug,Memory,Disk,PriceMonthly |
-		awk 'NR==1 {next} {print}' |
-		sort -k4 -n |
-		head -n 3 |
-		awk '{printf "%-25s %-10s %-10s $%-10s\n", $1, $2"MB", $3"GB", $4}'
-}
+function fetch_droplet() {
+	# Fetch and display droplet info
+	ask DROPLET_NAME "${YELLOW}What is the name of the Droplet you created?${END}" validate_droplet
 
-function select_droplet_size() {
-	local sizes
-	sizes=$(format_size_list)
+	local droplet_info
+	droplet_info=$(doctl compute droplet get "$DROPLET_NAME" --format "Name,PublicIPv4,Memory,Disk,Region" --no-header)
 
-	p "${YELLOW}Available Droplet sizes:${END}"
-	echo "$sizes"
-	p ""
-
-	local selected_size=""
-	local valid_slugs=($(echo "$sizes" | awk '{print $1}'))
-	local default_size="${valid_slugs[0]}"
-
-	while true; do
-		p "${YELLOW}Enter the slug of the size you want, or press Enter for the smallest size (${default_size}):${END}"
-		read -r selected_size
-
-		if [[ -z "$selected_size" ]]; then
-			selected_size="$default_size"
-			break
-		fi
-
-		for slug in "${valid_slugs[@]}"; do
-			if [[ "$selected_size" == "$slug" ]]; then
-				break 2
-			fi
-		done
-
-		p "${RED}Invalid size. Please choose from the list above.${END}"
-	done
-
-	echo "$selected_size"
+	if [[ $? -eq 0 ]]; then
+		p "${GREEN}Droplet information:${END}"
+		echo "$droplet_info" | awk '{printf "Name: %s\nIP: %s\nMemory: %s MB\nDisk: %s GB\nRegion: %s\n", $1, $2, $3, $4, $5}'
+		DROPLET_IP=$(echo "$droplet_info" | awk '{print $2}')
+	else
+		p "${RED}Failed to fetch Droplet information. Please make sure you entered the correct Droplet name.${END}"
+		return 1
+	fi
 }
 
 # Add this function to validate IP addresses
