@@ -46,64 +46,48 @@ main() {
 		wait_for_key
 
 		if ask_yn "Do you need me to create a Droplet for you?"; then
-			# Prerequisite: `doctl`
-			p "Dropship uses DigitalOcean's ${YELLOW_BOLD}doctl${END} CLI tool to set up Droplets."
-			p ""
+			if ! setup_doctl; then
+				p ""
+				p "${RED}Failed to set up doctl. Please try again.${END}"
+				p ""
+				return 1
+			fi
 
-			if $DOCTL_INSTALLED; then
-				p "${GREEN}✅ doctl is installed!${END}"
-			else
-				if ! install_doctl; then
+			if ! auth_doctl; then
+				p ""
+				p "${RED}Failed to authenticate doctl. Please try again.${END}"
+				p ""
+				return 1
+			fi
+
+			local droplet_size="s-1vcpu-512mb-10gb"
+			if ask_yn "${YELLOW}Do you want to create the default smallest droplet (~$4/mo), ${droplet_size}, in the San Francisco 3 region? (Y/n)${END}"; then
+				if ! create_droplet $droplet_size; then
+					p ""
+					p "${RED}Failed to create droplet. Please try again or create one manually.${END}"
+					p "${GRAY}View your current droplets here: https://cloud.digitalocean.com/droplets${END}"
 					p ""
 					return 1
 				fi
+			else
+				p ""
+				p "${YELLOW}Please create a droplet instance by going here:${END}"
+				p "${CYAN}https://cloud.digitalocean.com/droplets/new${END}"
+				p ""
 			fi
-
-			p "${YELLOW}Authenticating with DigitalOcean...${END}"
-			p ""
-			p "Note: when you create a Personal Access Token, enable at least these scopes:"
-			p "${YELLOW_BOLD}certificate${END} (create, read)"
-			p "${YELLOW_BOLD}domain${END} (create, read, update)"
-			p "${YELLOW_BOLD}droplet${END} (create, read, update)"
-			p "${YELLOW_BOLD}ssh_key${END} (create, read)"
-			p ""
-
-			if ! doctl auth init; then
-				p "${RED}Authentication failed. Please check the following:${END}"
-				p "1. ${YELLOW}Ensure you have a valid DigitalOcean API token${END}"
-				p "2. ${YELLOW}Check your internet connection${END}"
-				p "3. ${YELLOW}Verify that doctl is properly installed${END}"
-				p ""
-				p "${CYAN}For more information on creating an API token, visit:${END}"
-				p "${DKGRAY}Docs: https://docs.digitalocean.com/reference/api/create-personal-access-token/${END}"
-				p "${DKGRAY}Link: https://cloud.digitalocean.com/account/api/tokens${END}"
-				p ""
-				p "${YELLOW}If the problem persists, please try running 'doctl auth init' manually for more detailed error messages.${END}"
-				p ""
-				return 1
-			fi
-
-			p "${GREEN}Authentication successful!${END}"
-
-			if ! create_droplet ""; then
-				p ""
-				p "${RED}Failed to create or fetch Droplet information. Please exit and try again.${END}"
-				p "${GRAY}View your current droplets here: https://cloud.digitalocean.com/droplets${END}"
-				p ""
-				return 1
-			fi
-
-			if ! fetch_droplet; then
-				p ""
-				p "${RED}Failed to fetch the ${DROPLET_NAME} droplet.${END}"
-				p "${GRAY}View your current droplets here: https://cloud.digitalocean.com/droplets${END}"
-				p ""
-				return 1
-			fi
-
 		else
-			p "${YELLOW}Please create a Droplet manually and note its IP address.${END}"
-			ask DROPLET_IP "${YELLOW}What is the Droplet's IP address?${END}" validate_ip
+			p ""
+			p "${YELLOW}Please create a droplet instance by going here:${END}"
+			p "${CYAN}https://cloud.digitalocean.com/droplets/new${END}"
+			p ""
+		fi
+
+		if ! fetch_droplet; then
+			p ""
+			p "${RED}Failed to fetch the ${DROPLET_NAME} droplet.${END}"
+			p "${GRAY}View your current droplets here: https://cloud.digitalocean.com/droplets${END}"
+			p ""
+			return 1
 		fi
 
 		p "" # Manual steps that I still need to script:
@@ -254,6 +238,52 @@ function check_brew() {
 	fi
 }
 
+function setup_doctl() {
+	# Prerequisite: `doctl`
+	p "Dropship uses DigitalOcean's ${YELLOW_BOLD}doctl${END} CLI tool to set up Droplets."
+	p ""
+
+	if $DOCTL_INSTALLED; then
+		p "${GREEN}✅ doctl is installed!${END}"
+	else
+		if ! install_doctl; then
+			p ""
+			return 1
+		fi
+	fi
+
+	return 0
+}
+
+function auth_doctl() {
+	p "${YELLOW}Authenticating with DigitalOcean...${END}"
+	p ""
+	p "Note: when you create a Personal Access Token, enable at least these scopes:"
+	p "${YELLOW_BOLD}certificate${END} (create, read)"
+	p "${YELLOW_BOLD}domain${END} (create, read, update)"
+	p "${YELLOW_BOLD}droplet${END} (create, read, update)"
+	p "${YELLOW_BOLD}ssh_key${END} (create, read)"
+	p ""
+
+	if ! doctl auth init; then
+		p "${RED}Authentication failed. Please check the following:${END}"
+		p "1. ${YELLOW}Ensure you have a valid DigitalOcean API token${END}"
+		p "2. ${YELLOW}Check your internet connection${END}"
+		p "3. ${YELLOW}Verify that doctl is properly installed${END}"
+		p ""
+		p "${CYAN}For more information on creating an API token, visit:${END}"
+		p "${DKGRAY}Docs: https://docs.digitalocean.com/reference/api/create-personal-access-token/${END}"
+		p "${DKGRAY}Link: https://cloud.digitalocean.com/account/api/tokens${END}"
+		p ""
+		p "${YELLOW}If the problem persists, please try running 'doctl auth init' manually for more detailed error messages.${END}"
+		p ""
+		return 1
+	fi
+
+	p "${GREEN}Authentication successful!${END}"
+	return 0
+}
+
 function install_doctl() {
 	if $BREW_INSTALLED; then
 		if ask_yn "${YELLOW}Would you like to install doctl via Homebrew? (Y/n)${END}"; then
@@ -313,49 +343,39 @@ function show_progress() {
 function create_droplet() {
 	local region="sfo3"
 	local image="ubuntu-24-04-x64"
-	local size="s-1vcpu-512mb-10gb"
+	local size="$1"
 
-	if ask_yn "${YELLOW}Do you want to create the default smallest droplet (~$4/mo), s-1vcpu-512mb-10gb, in the San Francisco 3 region? (Y/n)${END}"; then
-		ask DROPLET_NAME "${YELLOW}What is the Droplet name?${END} ${DKGRAY}(e.g. my-awesome-droplet)" validate_droplet
+	ask DROPLET_NAME "${YELLOW}What is the Droplet name?${END} ${DKGRAY}(e.g. my-awesome-droplet)" validate_droplet
 
-		p "${YELLOW}Creating Droplet...${END}"
-		local output
-		output=$(doctl compute droplet create "$DROPLET_NAME" --region "$region" --size "$size" --image "$image" 2>&1)
+	p "${YELLOW}Creating Droplet...${END}"
+	local output
+	output=$(doctl compute droplet create "$DROPLET_NAME" --region "$region" --size "$size" --image "$image" 2>&1)
 
-		# Check if the command was successful
-		if [[ $? -ne 0 ]]; then
-			p "${RED}Failed to create Droplet. Error: ${output}${END}"
+	# Check if the command was successful
+	if [[ $? -ne 0 ]]; then
+		p "${RED}Failed to create Droplet. Error: ${output}${END}"
+		return 1
+	fi
+
+	p "${GRAY}(View Droplet status here: https://cloud.digitalocean.com/droplets)${END}"
+
+	# Wait for the Droplet to be active
+	p "${YELLOW}Waiting for Droplet to be ready...${END}"
+	local max_attempts=60
+	local attempts=0
+	while true; do
+		status=$(doctl compute droplet get "$DROPLET_NAME" --format Status --no-header)
+		if [[ "$status" == "active" ]]; then
+			break
+		fi
+		((attempts++))
+		if [[ $attempts -ge $max_attempts ]]; then
+			p "${RED}Timed out waiting for Droplet to become active. Please check your DigitalOcean dashboard.${END}"
+			p "${DKGRAY}Link: https://cloud.digitalocean.com/droplets${END}"
 			return 1
 		fi
-
-		p "${GRAY}(View Droplet status here: https://cloud.digitalocean.com/droplets)${END}"
-
-		# Wait for the Droplet to be active
-		p "${YELLOW}Waiting for Droplet to be ready...${END}"
-		local max_attempts=60
-		local attempts=0
-		while true; do
-			status=$(doctl compute droplet get "$DROPLET_NAME" --format Status --no-header)
-			if [[ "$status" == "active" ]]; then
-				break
-			fi
-			((attempts++))
-			if [[ $attempts -ge $max_attempts ]]; then
-				p "${RED}Timed out waiting for Droplet to become active. Please check your DigitalOcean dashboard.${END}"
-				p "${DKGRAY}Link: https://cloud.digitalocean.com/droplets${END}"
-				return 1
-			fi
-			sleep 5
-		done
-
-		# Get the Droplet's IP address
-		DROPLET_IP=$(doctl compute droplet get "$DROPLET_NAME" --format PublicIPv4 --no-header)
-		p "${GREEN}Droplet created successfully with IP: ${DROPLET_IP}${END}"
-	else
-		p "${YELLOW}Please create a droplet instance by going here:${END}"
-		p "${CYAN}https://cloud.digitalocean.com/droplets/new${END}"
-		p ""
-	fi
+		sleep 5
+	done
 
 	return 0
 }
