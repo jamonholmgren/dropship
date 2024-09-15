@@ -62,18 +62,32 @@ main() {
 
 			p "${YELLOW}Authenticating with DigitalOcean...${END}"
 			p ""
-			p "Note: when you create an API key, enable these scopes:"
+			p "Note: when you create a Personal Access Token, enable at least these scopes:"
 			p "${YELLOW_BOLD}certificate${END} (create, read)"
 			p "${YELLOW_BOLD}domain${END} (create, read, update)"
 			p "${YELLOW_BOLD}droplet${END} (create, read, update)"
 			p "${YELLOW_BOLD}ssh_key${END} (create, read)"
+			p "${YELLOW_BOLD}sizes${END} (read)"
 			p ""
-			doctl auth init
+
+			if ! doctl auth init; then
+				p "${RED}Authentication failed. Please check the following:${END}"
+				p "1. ${YELLOW}Ensure you have a valid DigitalOcean API token${END}"
+				p "2. ${YELLOW}Check your internet connection${END}"
+				p "3. ${YELLOW}Verify that doctl is properly installed${END}"
+				p ""
+				p "${CYAN}For more information on creating an API token, visit:${END}"
+				p "${DKGRAY}Docs: https://docs.digitalocean.com/reference/api/create-personal-access-token/${END}"
+				p "${DKGRAY}Link: https://cloud.digitalocean.com/account/api/tokens${END}"
+				p ""
+				p "${YELLOW}If the problem persists, please try running 'doctl auth init' manually for more detailed error messages.${END}"
+				p ""
+				return 1
+			fi
+
 			p "${GREEN}Authentication successful!${END}"
 
-			ok=create_droplet "$DROPLET_NAME"
-
-			if ! ok; then
+			if ! create_droplet "$DROPLET_NAME"; then
 				p ""
 				p "${RED}Failed to create Droplet. Please exit and try again or create one manually.${END}"
 				p "${GRAY}View your current droplets here: https://cloud.digitalocean.com/droplets${END}"
@@ -297,8 +311,10 @@ function show_progress() {
 function create_droplet() {
 	local droplet_name="$1"
 	local region="nyc1"
-	local size="s-1vcpu-1gb"
 	local image="ubuntu-20-04-x64"
+
+	local size
+	size=$(select_droplet_size)
 
 	p "${YELLOW}Creating Droplet...${END}"
 	local output
@@ -341,6 +357,47 @@ function create_droplet() {
 	DROPLET_IP=$(doctl compute droplet get "$droplet_name" --format PublicIPv4 --no-header)
 	p "${GREEN}Droplet created successfully with IP: ${DROPLET_IP}${END}"
 	return 0
+}
+
+function format_size_list() {
+	doctl compute size list --format Slug,Memory,Disk,PriceMonthly |
+		awk 'NR==1 {next} {print}' |
+		sort -k4 -n |
+		head -n 3 |
+		awk '{printf "%-25s %-10s %-10s $%-10s\n", $1, $2"MB", $3"GB", $4}'
+}
+
+function select_droplet_size() {
+	local sizes
+	sizes=$(format_size_list)
+
+	p "${YELLOW}Available Droplet sizes:${END}"
+	echo "$sizes"
+	p ""
+
+	local selected_size=""
+	local valid_slugs=($(echo "$sizes" | awk '{print $1}'))
+	local default_size="${valid_slugs[0]}"
+
+	while true; do
+		p "${YELLOW}Enter the slug of the size you want, or press Enter for the smallest size (${default_size}):${END}"
+		read -r selected_size
+
+		if [[ -z "$selected_size" ]]; then
+			selected_size="$default_size"
+			break
+		fi
+
+		for slug in "${valid_slugs[@]}"; do
+			if [[ "$selected_size" == "$slug" ]]; then
+				break 2
+			fi
+		done
+
+		p "${RED}Invalid size. Please choose from the list above.${END}"
+	done
+
+	echo "$selected_size"
 }
 
 # Add this function to validate IP addresses
